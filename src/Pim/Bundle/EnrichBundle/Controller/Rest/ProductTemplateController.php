@@ -118,7 +118,7 @@ class ProductTemplateController
      */
     protected function removeIdentifierViolations(ConstraintViolationListInterface $violations)
     {
-        $identifierPath = sprintf('values[%s]', $this->attributeRepository->getIdentifierCode());
+        $identifierPath = sprintf('values[%s-<all_channels>-<all_locales>]', $this->attributeRepository->getIdentifierCode());
         foreach ($violations as $offset => $violation) {
             if (0 === strpos($violation->getPropertyPath(), $identifierPath)) {
                 $violations->remove($offset);
