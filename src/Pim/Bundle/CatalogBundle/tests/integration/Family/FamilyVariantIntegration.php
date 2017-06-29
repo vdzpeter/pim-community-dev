@@ -24,7 +24,7 @@ class FamilyVariantIntegration extends TestCase
             'label' => [
                 'en_US' => 'My family variant'
             ],
-            'variant-attribute-sets' => [
+            'variant_attribute_sets' => [
                 [
                     'axes' => ['color'],
                     'attributes' => ['weather_conditions', 'rating', 'side_view', 'top_view', 'lace_color']
@@ -43,12 +43,12 @@ class FamilyVariantIntegration extends TestCase
 
         /** @var FamilyVariantInterface $variantFamily */
         $variantFamily = $this->get('pim_catalog.repository.family_variant')->findOneByIdentifier('family_variant');
-        Assert::notNull($variantFamily, 'The family variant with the code "family_variant" does not exist');
+        $this->assertNotNull($variantFamily, 'The family variant with the code "family_variant" does not exist');
 
         $this->assertEquals('boots', $variantFamily->getFamily()->getCode(), 'The family code does not match boots');
         $this->assertEquals(
             ['name', 'manufacturer', 'description'],
-            $this->extractAttributeCode($variantFamily->getCommonAttributeSet()->getAttributes()),
+            $this->extractAttributeCode($variantFamily->getCommonAttributes()),
             'Common attributes are invalid'
         );
 
@@ -92,7 +92,7 @@ class FamilyVariantIntegration extends TestCase
             'label' => [
                 'en_US' => 'My family variant'
             ],
-            'variant-attribute-sets' => [
+            'variant_attribute_sets' => [
                 [
                     'axes' => ['color'],
                     'attributes' => ['weather_conditions', 'rating', 'side_view', 'top_view', 'lace_color']
@@ -124,7 +124,7 @@ class FamilyVariantIntegration extends TestCase
             'label' => [
                 'en_US' => 'My family variant'
             ],
-            'variant-attribute-sets' => [
+            'variant_attribute_sets' => [
                 [
                     'axes' => ['color'],
                     'attributes' => ['weather_conditions', 'rating', 'side_view', 'top_view', 'lace_color']
@@ -156,7 +156,7 @@ class FamilyVariantIntegration extends TestCase
             'label' => [
                 'en_US' => 'My family variant'
             ],
-            'variant-attribute-sets' => [
+            'variant_attribute_sets' => [
                 [
                     'axes' => ['color'],
                     'attributes' => ['weather_conditions', 'rating', 'side_view', 'top_view', 'lace_color']
@@ -188,7 +188,7 @@ class FamilyVariantIntegration extends TestCase
             'label' => [
                 'en_US' => 'My family variant'
             ],
-            'variant-attribute-sets' => [
+            'variant_attribute_sets' => [
                 [
                     'axes' => ['side_view'],
                     'attributes' => ['weather_conditions', 'rating', 'color', 'top_view', 'lace_color']
@@ -231,7 +231,7 @@ class FamilyVariantIntegration extends TestCase
             'label' => [
                 'en_US' => 'My family variant'
             ],
-            'variant-attribute-sets' => [
+            'variant_attribute_sets' => [
                 [
                     'axes' => ['color'],
                     'attributes' => ['weather_conditions', 'rating', 'side_view', 'top_view', 'lace_color']
@@ -257,8 +257,10 @@ class FamilyVariantIntegration extends TestCase
      */
     private function extractAttributeCode(Collection $collection): array
     {
-        return $collection->map(function(AttributeInterface $attribute) {
+        $codes = $collection->map(function(AttributeInterface $attribute) {
             return $attribute->getCode();
         })->toArray();
+
+        return array_values($codes);
     }
 }

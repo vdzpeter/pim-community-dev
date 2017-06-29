@@ -23,7 +23,7 @@ class FamilyVariant implements FamilyVariantInterface
     private $family;
 
     /** @var Collection */
-    private $attributeSets;
+    private $variantAttributeSets;
 
     /** @var string */
     private $locale;
@@ -33,7 +33,7 @@ class FamilyVariant implements FamilyVariantInterface
 
     public function __construct()
     {
-        $this->attributeSets = new ArrayCollection();
+        $this->variantAttributeSets = new ArrayCollection();
         $this->translations = new ArrayCollection();
     }
 
@@ -56,7 +56,7 @@ class FamilyVariant implements FamilyVariantInterface
     /**
      * {@inheritdoc}
      */
-    public function setCode(string $code)
+    public function setCode(string $code): void
     {
         $this->code = $code;
     }
@@ -64,47 +64,56 @@ class FamilyVariant implements FamilyVariantInterface
     /**
      * {@inheritdoc}
      */
-    public function getCommonAttributeSet(): AttributeSetInterface
+    public function getCommonAttributes(): CommonAttributeCollection
     {
-        return $this->attributeSets->get(0);
+        $commonAttributes = CommonAttributeCollection::fromCollection($this->family->getAttributes());
+
+        foreach ($this->variantAttributeSets as $variantAttributeSet) {
+            foreach ($variantAttributeSet->getAxes() as $axis) {
+                $commonAttributes->removeElement($axis);
+            }
+
+            foreach ($variantAttributeSet->getAttributes() as $attribute) {
+                $commonAttributes->removeElement($attribute);
+            }
+        }
+
+        return $commonAttributes;
     }
 
     /**
      * {@inheritdoc}
      */
-    public function getVariantAttributeSet(int $level): AttributeSetInterface
+    public function getVariantAttributeSet(int $level): VariantAttributeSetInterface
     {
         if ($level <= 0) {
             throw new \InvalidArgumentException('The level must be greater than 0');
         }
 
-        return $this->attributeSets->get($level);
+        return $this->variantAttributeSets->get($level);
     }
 
     /**
      * {@inheritdoc}
      */
-    public function getAttributes(): ArrayCollection
+    public function getAttributes(): Collection
     {
-        $axes = [];
-        foreach ($this->attributeSets as $attributeSet) {
-            $variantSetAxes = $attributeSet->getAttributes()->toArray();
-            $axes = array_merge($axes, $variantSetAxes);
+        $attributes = [];
+        foreach ($this->variantAttributeSets as $attributeSet) {
+            $variantAttributeSetAttributes = $attributeSet->getAttributes()->toArray();
+            $attributes = array_merge($attributes, $variantAttributeSetAttributes);
         }
 
-        return new ArrayCollection($axes);
+        return new ArrayCollection($attributes);
     }
 
     /**
      * {@inheritdoc}
      */
-    public function getAxes(): ArrayCollection
+    public function getAxes(): Collection
     {
-        $attributeSets = clone $this->attributeSets;
-        $attributeSets->remove(0);
-
         $axes = [];
-        foreach ($attributeSets as $attributeSet) {
+        foreach ($this->variantAttributeSets as $attributeSet) {
             $variantSetAxes = $attributeSet->getAxes()->toArray();
             $axes = array_merge($axes, $variantSetAxes);
         }
@@ -115,21 +124,13 @@ class FamilyVariant implements FamilyVariantInterface
     /**
      * {@inheritdoc}
      */
-    public function addVariantAttributeSet(int $level, AttributeSetInterface $variantAttributeSets): void
+    public function addVariantAttributeSet(int $level, VariantAttributeSetInterface $variantAttributeSet): void
     {
         if ($level <= 0) {
             throw new \InvalidArgumentException('The level must be greater than 0');
         }
 
-        $this->attributeSets->set($level, $variantAttributeSets);
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    public function addCommonAttributeSet(AttributeSetInterface $variantAttributeSets): void
-    {
-        $this->attributeSets->set(0, $variantAttributeSets);
+        $this->variantAttributeSets->set($level, $variantAttributeSet);
     }
 
     /**

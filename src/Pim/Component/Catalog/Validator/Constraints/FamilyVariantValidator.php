@@ -2,8 +2,7 @@
 
 namespace Pim\Component\Catalog\Validator\Constraints;
 
-use Doctrine\Common\Collections\ArrayCollection;
-use Pim\Component\Catalog\AttributeTypes;
+use Doctrine\Common\Collections\Collection;
 use Pim\Component\Catalog\Model\AttributeInterface;
 use Pim\Component\Catalog\Model\FamilyVariantInterface;
 use Symfony\Component\Translation\TranslatorInterface;
@@ -23,9 +22,13 @@ class FamilyVariantValidator extends ConstraintValidator
     /** @var TranslatorInterface */
     private $translator;
 
-    public function __construct(TranslatorInterface $translator)
+    /** @var array */
+    private $availableTypes;
+
+    public function __construct(TranslatorInterface $translator, array $availableTypes)
     {
         $this->translator = $translator;
+        $this->availableTypes = $availableTypes;
     }
 
     /**
@@ -33,7 +36,7 @@ class FamilyVariantValidator extends ConstraintValidator
      *
      * @param FamilyVariantInterface $familyVariant
      */
-    public function validate($familyVariant, Constraint $constraint)
+    public function validate($familyVariant, Constraint $constraint): void
     {
         if (!$familyVariant instanceof FamilyVariantInterface) {
             throw new UnexpectedTypeException($constraint, FamilyVariantInterface::class);
@@ -50,9 +53,9 @@ class FamilyVariantValidator extends ConstraintValidator
     /**
      * Validate the attribute set attributes
      *
-     * @param ArrayCollection $attributes
+     * @param Collection $attributes
      */
-    private function validateAttributes(ArrayCollection $attributes)
+    private function validateAttributes(Collection $attributes): void
     {
         $attributeCodes = $attributes->map(function (AttributeInterface $attribute) {
             return $attribute->getCode();
@@ -67,21 +70,14 @@ class FamilyVariantValidator extends ConstraintValidator
     /**
      * Validate the attribute set axis
      *
-     * @param ArrayCollection $axes
+     * @param Collection $axes
      */
-    private function validateAxes(ArrayCollection $axes)
+    private function validateAxes(Collection $axes): void
     {
-        $availableTypes = [
-            AttributeTypes::METRIC,
-            AttributeTypes::OPTION_SIMPLE_SELECT,
-            AttributeTypes::BOOLEAN,
-            AttributeTypes::REFERENCE_DATA_SIMPLE_SELECT
-        ];
-
         $axisCodes = [];
         foreach ($axes as $axis) {
             $axisCodes[] = $axis->getCode();
-            if (!in_array($axis->getType(), $availableTypes)) {
+            if (!in_array($axis->getType(), $this->availableTypes)) {
                 $message = $this->translator->trans('pim_catalog.constraint.family_variant_axes_type');
                 $this->context->buildViolation($message)->addViolation();
             }
