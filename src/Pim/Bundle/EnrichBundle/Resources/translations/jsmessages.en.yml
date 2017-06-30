@@ -224,6 +224,7 @@ pim_enrich:
                     family: Choose a family
                     save: Save
                     cancel: Cancel
+            completeness: Complete
         attribute:
             scopable: Scopable
             global: Global
