@@ -297,13 +297,7 @@ class Edit extends ProductEditForm
      */
     public function disableProduct()
     {
-        $el = $this->getElement('Status switcher');
-
-        $this->getProductStatusSwitcherCaret()->click();
-        $button = $el->find('css', 'ul a[data-status="disable"]');
-        if ($button) {
-            $button->click();
-        }
+        $this->switchProductStatus('disable');
 
         return $this;
     }
@@ -315,15 +309,28 @@ class Edit extends ProductEditForm
      */
     public function enableProduct()
     {
-        $el = $this->getElement('Status switcher');
-
-        $this->getProductStatusSwitcherCaret()->click();
-        $button = $el->find('css', 'ul a[data-status="enable"]');
-        if ($button) {
-            $button->click();
-        }
+        $this->switchProductStatus('enable');
 
         return $this;
+    }
+
+    /**
+     * @param string $status enable|disable
+     */
+    protected function switchProductStatus($status)
+    {
+        $dropdown = $this->spin(function () {
+            return $this->getClosest($this->getElement('Status switcher'), 'AknDropdown');
+        }, 'Can not find dropdown of product status switcher');
+        $dropdown->click();
+
+        $button = $this->spin(function () use ($dropdown, $status) {
+            $result = $dropdown->find('css', sprintf('*[data-status="%s"]', $status));
+
+            return $result !== null && $result->isVisible() ? $result : null;
+        }, sprintf('Can not find status "%s"', $status));
+
+        $button->click();
     }
 
     /**
@@ -632,19 +639,5 @@ class Edit extends ProductEditForm
         return $this->spin(function () use ($dropdownMenu) {
             return $dropdownMenu->find('css', '.save-product-and-back');
         }, '"Save and back" button not found');
-    }
-
-    /**
-     * Get the caret of the product switcher to provide click
-     *
-     * @return NodeElement
-     */
-    protected function getProductStatusSwitcherCaret()
-    {
-        $el = $this->getElement('Status switcher');
-
-        return $this->spin(function () use ($el) {
-            return $el->find('css', '.AknDropdownButton-caretContainer');
-        }, 'Unable to find the status dropdown caret to enable or disable product on PEF');
     }
 }
