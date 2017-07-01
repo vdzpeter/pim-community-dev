@@ -6,32 +6,50 @@ def features = "features"
 def launchUnitTests = "yes"
 def launchIntegrationTests = "yes"
 def launchBehatTests = "yes"
+def testFiles = []
+def nbSlaveIntegration = 10
 
 stage("Checkout") {
     milestone 1
     if (env.BRANCH_NAME =~ /^PR-/) {
-        userInput = input(message: 'Launch tests?', parameters: [
-            choice(choices: 'yes\nno', description: 'Run unit tests and code style checks', name: 'launchUnitTests'),
-            choice(choices: 'yes\nno', description: 'Run integration tests', name: 'launchIntegrationTests'),
-            choice(choices: 'yes\nno', description: 'Run behat tests', name: 'launchBehatTests'),
-            string(defaultValue: 'ee,ce', description: 'PIM edition the behat tests should run on (comma separated values)', name: 'editions'),
-            string(defaultValue: 'features,vendor/akeneo/pim-community-dev/features', description: 'Behat scenarios to build', name: 'features'),
-            choice(choices: '7.1', description: 'PHP version to run behat with', name: 'phpVersion'),
-        ])
+        //userInput = input(message: 'Launch tests?', parameters: [
+        //    choice(choices: 'yes\nno', description: 'Run unit tests and code style checks', name: 'launchUnitTests'),
+        //    choice(choices: 'yes\nno', description: 'Run integration tests', name: 'launchIntegrationTests'),
+        //    choice(choices: 'yes\nno', description: 'Run behat tests', name: 'launchBehatTests'),
+        //    string(defaultValue: 'ee,ce', description: 'PIM edition the behat tests should run on (comma separated values)', name: 'editions'),
+        //    string(defaultValue: 'features,vendor/akeneo/pim-community-dev/features', description: 'Behat scenarios to build', name: 'features'),
+        //    choice(choices: '7.1', description: 'PHP version to run behat with', name: 'phpVersion'),
+        //])
 
-        editions = userInput['editions'].tokenize(',')
-        features = userInput['features']
-        phpVersion = userInput['phpVersion']
-        launchUnitTests = userInput['launchUnitTests']
-        launchIntegrationTests = userInput['launchIntegrationTests']
-        launchBehatTests = userInput['launchBehatTests']
+        //editions = userInput['editions'].tokenize(',')
+        //features = userInput['features']
+        //phpVersion = userInput['phpVersion']
+        //launchUnitTests = userInput['launchUnitTests']
+        //launchIntegrationTests = userInput['launchIntegrationTests']
+        //launchBehatTests = userInput['launchBehatTests']
+        editions = ["ce"]
+        features = "features,vendor/akeneo/pim-community-dev/features"
+        phpVersion = "7.1"
+        launchUnitTests = "no"
+        launchIntegrationTests = "yes"
+        launchBehatTests = "no"
     }
     milestone 2
 
     node {
         deleteDir()
         checkout scm
+
+        def output = sh (
+            returnStdout: true,
+            script: 'find src/ -name \"*Integration.php\"'
+        )
+        testFiles = output.tokenize('\n')
+
+
+
         stash "pim_community_dev"
+        deleteDir()
 
         if (editions.contains('ee') && 'yes' == launchBehatTests) {
            checkout([$class: 'GitSCM',
@@ -129,14 +147,20 @@ if (launchIntegrationTests.equals("yes")) {
     stage("Integration tests") {
         def tasks = [:]
 
-        tasks["integration-7.1-akeneo"] = {runIntegrationTest("7.1", "Akeneo_Integration_Test")}
-        tasks["integration-7.1-api-base"] = {runIntegrationTest("7.1", "PIM_Api_Base_Integration_Test")}
-        tasks["integration-7.1-api-controllers"] = {runIntegrationTest("7.1", "PIM_Api_Bundle_Controllers_Integration_Test")}
-        tasks["integration-7.1-api-controllers-catalog"] = {runIntegrationTest("7.1", "PIM_Api_Bundle_Controllers_Catalog_Integration_Test")}
-        tasks["integration-7.1-api-controller-product"] = {runIntegrationTest("7.1", "PIM_Api_Bundle_Controller_Product_Integration_Test")}
-        tasks["integration-7.1-catalog"] = {runIntegrationTest("7.1", "PIM_Catalog_Integration_Test")}
-        tasks["integration-7.1-completeness"] = {runIntegrationTest("7.1", "PIM_Catalog_Completeness_Integration_Test")}
-        tasks["integration-7.1-pqb"] = {runIntegrationTest("7.1", "PIM_Catalog_PQB_Integration_Test")}
+        // should be rework with Math.ceil but function currently not allowed for security reason
+        def nbTestsPerSlave = testFiles.size().intdiv(nbSlaveIntegration) + 1
+
+        for(int i = 0; i < nbSlaveIntegration; i++) {
+            int fromIndex = i * nbTestsPerSlave
+            int toIndex = fromIndex + nbTestsPerSlave - 1
+            // should be rework with testFiles.subList(fromIndex, toIndex), currently not allowed for security reason
+            def subListTests = []
+            for (int j = fromIndex; j <= toIndex && j < testFiles.size(); j++) {
+                subListTests += testFiles[j]
+            }
+
+            tasks["integration-tests-${fromIndex}-to-${toIndex}"] = {runIntegrationTest("7.1", subListTests)}
+        }
 
         parallel tasks
     }
@@ -198,7 +222,7 @@ def runPhpUnitTest(phpVersion) {
     }
 }
 
-def runIntegrationTest(phpVersion, testSuiteName) {
+def runIntegrationTest(phpVersion, testFiles) {
     node('docker') {
         deleteDir()
         sh "docker stop \$(docker ps -a -q) || true"
@@ -218,7 +242,12 @@ def runIntegrationTest(phpVersion, testSuiteName) {
                         sh "./app/console --env=test pim:install --force"
 
                         sh "mkdir -p app/build/logs/"
-                        sh "./bin/phpunit -c app/phpunit.xml.dist --testsuite ${testSuiteName} --log-junit app/build/logs/phpunit_integration.xml"
+
+                        def i = 0
+                        for (testFile in testFiles) {
+                            sh "./bin/phpunit -c app/phpunit.xml.dist --log-junit app/build/logs/phpunit_integration_${i}.xml ${testFile} || true"
+                            i++
+                        }
                     }
                 }
             }
@@ -227,7 +256,7 @@ def runIntegrationTest(phpVersion, testSuiteName) {
             sh "docker rm \$(docker ps -a -q) || true"
             sh "docker volume rm \$(docker volume ls -q) || true"
 
-            sh "sed -i \"s/testcase name=\\\"/testcase name=\\\"[integration-${phpVersion}-${testSuiteName}] /\" app/build/logs/*.xml"
+            sh "sed -i \"s/testcase name=\\\"/testcase name=\\\"[integration-${phpVersion}] /\" app/build/logs/*.xml"
             junit "app/build/logs/*.xml"
 
             deleteDir()
